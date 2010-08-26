@@ -1,7 +1,9 @@
 #!/user/bin/perl
 
 use FindBin;
-use lib "$FindBin::Bin/../projects/Growl-Tiny/lib";
+use lib "$FindBin::Bin/../Growl-Tiny/lib";
+
+#use Find::Lib '../Growl-Tiny/lib';
 
 use CHI;
 use Data::Dump qw( dump );
@@ -69,11 +71,12 @@ while(1) {
         {   title   => "Watcher Alert!",
             sticky  => $sticky,
             subject => $subject,
-            image   => 'C:\scripts\icon.png',
+            image   => "$FindBin::Bin/icon.png",
         }
     );
 
     sleep($delay_seconds);
+    last if !$delay_seconds;
 }
 
 exit 0;
@@ -96,7 +99,7 @@ sub parse_program_arguments {
 			{ $::github_username = $username; }
 	-r[epo]     <repo>	Github repo name to check
 			{ $::github_repo = $repo; }
-	-t[ime]     <time>	Time in seconds between checks (default: 3600)
+	-t[ime]     <time>	Time in seconds between checks (default: 3600, 0: run once)
 			{ $::delay_seconds = $time; }
 	-d[ebug]	        Turns on debug mode
 			{ $::debug = 1; }
