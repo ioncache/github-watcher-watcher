@@ -43,6 +43,7 @@ my $repositories = [];
 if ( $github_repo ) {
     my @repos = ();
     if ( $github_repo =~ /,/) {
+        $github_repo =~ s{\s}{};
         @repos = split(',', $github_repo);
     }
     elsif ( $github_repo =~ / /){
