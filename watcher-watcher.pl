@@ -18,10 +18,10 @@ use WWW::Mechanize::Cached;
 my $mech_class = 'WWW::Mechanize';
 my $mech       = $mech_class->new;
 
-use vars qw/$debug $github_username $github_repo $delay_seconds $sticky/;
+use vars qw/$verbose $github_username $github_repo $delay_seconds $sticky/;
 
 # some option defaults
-$debug           = 0;
+$verbose           = 0;
 $github_username = '';
 $github_repo     = '';
 $delay_seconds   = 3600;
@@ -36,75 +36,106 @@ my $cache = CHI->new(
     share_file => '/tmp/git-growl',
 );
 
-my $cache_key = $github_repo . '-watchers';
-my $cached = $cache->get($cache_key) || [];
+# sets up the repository list
+# either a single repo if the commandline option is given
+# or all the repos for the specified user
+my $repositories = [];
+if ( $github_repo ) {
+    push @{$repositories}, $github_repo;
+}
+else {
+    $mech->get("$base_url/$github_username/");
+    $repositories = decode_json( $mech->content )->{repositories};
+    if ( $verbose ) {
+        say "Repositories for $github_username:";
+        foreach my $repo (@{$repositories}) {
+            say $repo->{name};
+        }
+    }
+}
 
-$mech->get("$base_url/$github_username/$github_repo/watchers");
-my $watchers = decode_json( $mech->content )->{watchers};
+# sets up the caches for each repo
+foreach my $repository (@{$repositories}) {
+    my $repo = $repository->{name};
+    my $cache_key = $repo . '-watchers';
+    my $cached = $cache->get($cache_key) || [];
 
-# only sets the cache to the list watchers if it was previously empty
-if (!@{$cached}) {
-    $cache->set( $cache_key => $watchers );
+    # only sets the cache to the list of watchers if it was previously empty
+    if (! scalar @{$cached}) {
+        $mech->get("$base_url/$github_username/$repo/watchers");
+        my $watchers = decode_json( $mech->content )->{watchers};
+        $cache->set( $cache_key => $watchers );
+    }
+    if ($verbose) {
+        say "Cache for $repo has " . scalar @{$cached} . " watchers.";
+        say "Cached watchers are:";
+        say dump $cached;
+    }
 }
 
 while (1) {
-    # sets some default Growl message information
-    my $title   = "Watcher count idle.";
-    my $subject = "$github_repo has " . @{$watchers} . " watchers.";
+    
+    foreach my $repository (@{$repositories}) {
+        my $repo = $repository->{name};
+        my $cache_key = $repo . '-watchers';
+        $mech->get("$base_url/$github_username/$repo/watchers");
+        my $watchers = decode_json( $mech->content )->{watchers};
 
-    # does some comparisons between the current watcher list and the old one
-    my $lc = List::Compare->new(
-        {   lists    => [ $cached, $watchers ],
-            unsorted => 1,
+        # sets some default Growl message information
+        my $title   = "$repo: Watcher count idle.";
+        my $subject = "Repo has " . @{$watchers} . " watchers.";
+    
+        # does some comparisons between the current watcher list and the old one
+        my $lc = List::Compare->new(
+            {   lists    => [ $cache->get($cache_key), $watchers ],
+                unsorted => 1,
+            }
+        );
+    
+        my @lost   = $lc->get_unique;
+        my @gained = $lc->get_complement;
+    
+        if (@lost) {
+            $subject .= "\n\nUnwatchers: " . join ", ", @lost;
+            if ($verbose) {
+                say "Unwatchers:";
+                say dump @lost;
+            }
         }
-    );
-
-    my @lost   = $lc->get_unique;
-    my @gained = $lc->get_complement;
-
-    if (@lost) {
-        $subject .= "\n\nUnwatchers: " . join ", ", @lost;
-    }
-
-    if (@gained) {
-        $subject .= "\n\nNew watchers: " . join ", ", @gained;
-    }
-
-    # updates the cache and changes the title if the watchers have changed
-    if ( @lost || @gained ) {
-        $title = "Watcher count changed!";
-        $cache->set( $cache_key => $watchers );
-    }
-
-    notify(
-        {   name    => "Watcher-Watcher",
-            title   => $title,
-            sticky  => $sticky,
-            subject => $subject,
-            image   => "$FindBin::Bin/icon.png",
+    
+        if (@gained) {
+            $subject .= "\n\nNew watchers: " . join ", ", @gained;
+            if ($verbose) {
+                say "New watchers:";
+                say dump @gained;
+            }
         }
-    );
+    
+        # updates the cache and changes the title if the watchers have changed
+        if ( @lost || @gained ) {
+            $title = "$repo: Watcher count changed!";
+            $cache->set( $cache_key => $watchers );
+        }
+    
+        notify(
+            {   name    => "Watcher-Watcher",
+                title   => $title,
+                sticky  => $sticky,
+                subject => $subject,
+                image   => "$FindBin::Bin/icon.png",
+            }
+        );
+    }
 
     sleep($delay_seconds);
     last if !$delay_seconds; # ends loop if number of seconds is < 1
-    
-    # updates the watcher list - this is done at the end of the loop to
-    # avoid repeating the process after the intial setup outside the loop
-    $mech->get("$base_url/$github_username/$github_repo/watchers");
-    $watchers = decode_json( $mech->content )->{watchers};
 }
 
 exit 0;
 
-sub test {
-
-    push @{$watchers}, 'somenewguy';    # test new watchers
-    shift @{$watchers};                 # test unwatchers
-
-    say dump $cached;
-    say dump $watchers;
-
-}
+#
+# Helper Methods
+#
 
 sub parse_program_arguments {
 
@@ -114,16 +145,16 @@ sub parse_program_arguments {
             { $::github_username = $username; }
     -r[epo]     <repo>	Github repo name to check
             { $::github_repo = $repo; }
-    -t[ime]     <time>	Time in seconds between checks (default: 3600, 0: run once)
+    -t[ime]     <time>	Time (seconds) between checks (default: 3600, 0: run once)
             { $::delay_seconds = $time; }
-    -d[ebug]	        Turns on debug mode
-            { $::debug = 1; }
+    -v[erbose]	        Turns on verbose mode
+            { $::verbose = 1; }
     -s[ticky]	        Makes growls stay on screen until clicked
             { $::sticky = 1; }
 
 EOT
 
-    if ($debug) {
+    if ($verbose) {
         say "\n***** Arguments *****";
         say "Username: $github_username";
         say "Repo:     $github_repo";
@@ -135,10 +166,5 @@ EOT
     if ( $github_username eq '' ) {
         say "\n*** A Github username is required.";
         exit 1;
-    }
-
-    if ( $github_repo eq '' ) {
-        say "\n*** A Github repo is required.";
-        exit 2;
     }
 }
