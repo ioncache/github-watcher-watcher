@@ -37,19 +37,37 @@ my $cache = CHI->new(
 );
 
 # sets up the repository list
-# either a single repo if the commandline option is given
+# either a single/list of repos from the commandline option
 # or all the repos for the specified user
 my $repositories = [];
 if ( $github_repo ) {
-    push @{$repositories}, $github_repo;
+    my @repos = ();
+    if ( $github_repo =~ /,/) {
+        @repos = split(',', $github_repo);
+    }
+    elsif ( $github_repo =~ / /){
+        @repos = split(' ', $github_repo);
+    }
+    else {
+        push @repos, $github_repo;
+    }
+
+    foreach my $repo (@repos) {
+        push @{$repositories}, { name => $repo };
+    }
+
+    if ( $verbose ) {
+        say dump $repositories;
+    }
 }
 else {
     $mech->get("$base_url/$github_username/");
     $repositories = decode_json( $mech->content )->{repositories};
     if ( $verbose ) {
         say "Repositories for $github_username:";
-        foreach my $repo (@{$repositories}) {
-            say $repo->{name};
+        foreach my $repository (@{$repositories}) {
+            say dump $repository;
+            say $repository->{name};
         }
     }
 }
