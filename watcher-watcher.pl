@@ -48,7 +48,7 @@ foreach my $repo (@{$github_repositories}) {
 }
 
 if ( $verbose ) {
-    say "\nRepositories for $github_username:";
+    say "\nRepositories owned by $github_username:";
     say dump @repositories;
 }
 
