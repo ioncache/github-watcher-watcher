@@ -3,8 +3,6 @@
 use FindBin;
 use lib "$FindBin::Bin/../Growl-Tiny/lib";
 
-#use Find::Lib '../Growl-Tiny/lib';
-
 use CHI;
 use Data::Dump qw( dump );
 use Getopt::Declare;
@@ -12,6 +10,7 @@ use Growl::Tiny qw( notify );
 use JSON;
 use List::Compare;
 use Modern::Perl;
+use Perl6::Junction qw( none );
 use WWW::Mechanize;
 use WWW::Mechanize::Cached;
 
@@ -21,7 +20,7 @@ my $mech       = $mech_class->new;
 use vars qw/$verbose $github_username $github_repo $delay_seconds $sticky/;
 
 # some option defaults
-$verbose           = 0;
+$verbose         = 0;
 $github_username = '';
 $github_repo     = '';
 $delay_seconds   = 3600;
@@ -36,10 +35,25 @@ my $cache = CHI->new(
     share_file => '/tmp/git-growl',
 );
 
-# sets up the repository list
-# either a single/list of repos from the commandline option
-# or all the repos for the specified user
-my $repositories = [];
+# gets a list of the all the repositories for username
+# if no repo name is given all repos from this list will be used
+# if a repo name is given, it will be checked against this list and an error
+# will be thrown if the repo name is not found -- this makes for a nicer
+# error than the one github throws back
+$mech->get("$base_url/$github_username/");
+my $github_repositories = decode_json( $mech->content )->{repositories};
+my @repositories = ();
+foreach my $repo (@{$github_repositories}) {
+    push @repositories, $repo->{name};
+}
+
+if ( $verbose ) {
+    say "Repositories for $github_username:";
+    say dump @repositories;
+}
+
+# if commandline repo name(s) list exists, use that list instead of the
+# entire repo list for the user
 if ( $github_repo ) {
     my @repos = ();
     if ( $github_repo =~ /,/) {
@@ -50,32 +64,32 @@ if ( $github_repo ) {
         @repos = split(' ', $github_repo);
     }
     else {
-        push @repos, $github_repo;
+        @repos = ( $github_repo );
     }
 
+    my @valid_repos = ();
     foreach my $repo (@repos) {
-        push @{$repositories}, { name => $repo };
+        if ( none(@repositories) eq $repo ) {
+            say "$github_username does not own a repo called: $repo" if $verbose;
+        } else {
+            push @valid_repos, $repo;
+        }
+    }
+
+    @repositories = @valid_repos;
+    if ( !@repositories ) {
+        say "\n*** $github_username does not own any of the specified repositories.";
+        exit 2;
     }
 
     if ( $verbose ) {
-        say dump $repositories;
-    }
-}
-else {
-    $mech->get("$base_url/$github_username/");
-    $repositories = decode_json( $mech->content )->{repositories};
-    if ( $verbose ) {
-        say "Repositories for $github_username:";
-        foreach my $repository (@{$repositories}) {
-            say dump $repository;
-            say $repository->{name};
-        }
+        say "Repos to be watched:";
+        say dump @repositories;
     }
 }
 
 # sets up the caches for each repo
-foreach my $repository (@{$repositories}) {
-    my $repo = $repository->{name};
+foreach my $repo (@repositories) {
     my $cache_key = $repo . '-watchers';
     my $cached = $cache->get($cache_key) || [];
 
@@ -94,8 +108,7 @@ foreach my $repository (@{$repositories}) {
 
 while (1) {
     
-    foreach my $repository (@{$repositories}) {
-        my $repo = $repository->{name};
+    foreach my $repo (@repositories) {
         my $cache_key = $repo . '-watchers';
         $mech->get("$base_url/$github_username/$repo/watchers");
         my $watchers = decode_json( $mech->content )->{watchers};
@@ -110,7 +123,7 @@ while (1) {
                 unsorted => 1,
             }
         );
-    
+
         my @lost   = $lc->get_unique;
         my @gained = $lc->get_complement;
     
@@ -144,6 +157,9 @@ while (1) {
                 image   => "$FindBin::Bin/icon.png",
             }
         );
+
+        # slight delay between growls when watching multiple repos
+        sleep(1);
     }
 
     sleep($delay_seconds);
