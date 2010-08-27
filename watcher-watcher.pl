@@ -160,16 +160,16 @@ sub parse_program_arguments {
 
     my $args = Getopt::Declare->new(<<'EOT');
 
-    -u[sername] <username>	Github username to check
-            { $::github_username = $username; }
-    -r[epo]     <repo>	Github repo name to check
-            { $::github_repo = $repo; }
-    -t[ime]     <time>	Time (seconds) between checks (default: 3600, 0: run once)
-            { $::delay_seconds = $time; }
-    -v[erbose]	        Turns on verbose mode
-            { $::verbose = 1; }
-    -s[ticky]	        Makes growls stay on screen until clicked
-            { $::sticky = 1; }
+	-u[sername] <username>	Github username to check
+			{ $::github_username = $username; }
+	-r[epo]     <repo>	Github repo name to check
+			{ $::github_repo = $repo; }
+	-t[ime]     <time>	Time (seconds) between checks (default: 3600, 0: run once)
+			{ $::delay_seconds = $time; }
+	-v[erbose]	        Turns on verbose mode
+			{ $::verbose = 1; }
+	-s[ticky]	        Makes growls stay on screen until clicked
+			{ $::sticky = 1; }
 
 EOT
 
