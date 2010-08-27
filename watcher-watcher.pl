@@ -48,7 +48,7 @@ foreach my $repo (@{$github_repositories}) {
 }
 
 if ( $verbose ) {
-    say "Repositories for $github_username:";
+    say "\nRepositories for $github_username:";
     say dump @repositories;
 }
 
@@ -70,7 +70,7 @@ if ( $github_repo ) {
     my @valid_repos = ();
     foreach my $repo (@repos) {
         if ( none(@repositories) eq $repo ) {
-            say "$github_username does not own a repo called: $repo" if $verbose;
+            say "\n*** $github_username does not own a repo called: $repo" if $verbose;
         } else {
             push @valid_repos, $repo;
         }
@@ -83,7 +83,7 @@ if ( $github_repo ) {
     }
 
     if ( $verbose ) {
-        say "Repos to be watched:";
+        say "\nRepos to be watched:";
         say dump @repositories;
     }
 }
@@ -100,7 +100,7 @@ foreach my $repo (@repositories) {
         $cache->set( $cache_key => $watchers );
     }
     if ($verbose) {
-        say "Cache for $repo has " . scalar @{$cached} . " watchers.";
+        say "\nCache for $repo has " . scalar @{$cached} . " watchers.";
         say "Cached watchers are:";
         say dump $cached;
     }
