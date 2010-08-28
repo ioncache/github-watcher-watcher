@@ -90,7 +90,7 @@ if ( $github_repo ) {
 
 # sets up the caches for each repo
 foreach my $repo (@repositories) {
-    my $cache_key = $repo . '-watchers';
+    my $cache_key = cache_key( $repo );
     my $cached = $cache->get($cache_key) || [];
 
     # only sets the cache to the list of watchers if it was previously empty
@@ -109,7 +109,7 @@ foreach my $repo (@repositories) {
 while (1) {
     
     foreach my $repo (@repositories) {
-        my $cache_key = $repo . '-watchers';
+        my $cache_key = cache_key( $repo );
         $mech->get("$base_url/$github_username/$repo/watchers");
         my $watchers = decode_json( $mech->content )->{watchers};
 
@@ -164,6 +164,11 @@ while (1) {
 
     sleep($delay_seconds);
     last if !$delay_seconds; # ends loop if number of seconds is < 1
+}
+
+sub cache_key {
+    my $repo = shift;
+    return join "-", $github_username, $repo, 'watchers';
 }
 
 exit 0;
