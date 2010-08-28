@@ -1,4 +1,4 @@
-#!/user/bin/perl
+#!/usr/bin/env perl
 
 use FindBin;
 use lib "$FindBin::Bin/../Growl-Tiny/lib";
