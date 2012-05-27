@@ -40,10 +40,10 @@ my $cache = CHI->new(
 # if a repo name is given, it will be checked against this list and an error
 # will be thrown if the repo name is not found -- this makes for a nicer
 # error than the one github throws back
-$mech->get("$base_url/$github_username/");
+$mech->get( "$base_url/$github_username/" );
 my $github_repositories = decode_json( $mech->content )->{repositories};
-my @repositories = ();
-foreach my $repo (@{$github_repositories}) {
+my @repositories        = ();
+foreach my $repo ( @{$github_repositories} ) {
     push @repositories, $repo->{name};
 }
 
@@ -56,29 +56,32 @@ if ( $verbose ) {
 # entire repo list for the user
 if ( $github_repo ) {
     my @repos = ();
-    if ( $github_repo =~ /,/) {
+    if ( $github_repo =~ /,/ ) {
         $github_repo =~ s{\s}{};
-        @repos = split(',', $github_repo);
+        @repos = split( ',', $github_repo );
     }
-    elsif ( $github_repo =~ / /){
-        @repos = split(' ', $github_repo);
+    elsif ( $github_repo =~ / / ) {
+        @repos = split( ' ', $github_repo );
     }
     else {
         @repos = ( $github_repo );
     }
 
     my @valid_repos = ();
-    foreach my $repo (@repos) {
-        if ( none(@repositories) eq $repo ) {
-            say "\n*** $github_username does not own a repo called: $repo" if $verbose;
-        } else {
+    foreach my $repo ( @repos ) {
+        if ( none( @repositories ) eq $repo ) {
+            say "\n*** $github_username does not own a repo called: $repo"
+                if $verbose;
+        }
+        else {
             push @valid_repos, $repo;
         }
     }
 
     @repositories = @valid_repos;
     if ( !@repositories ) {
-        say "\n*** $github_username does not own any of the specified repositories.";
+        say
+            "\n*** $github_username does not own any of the specified repositories.";
         exit 2;
     }
 
@@ -89,66 +92,66 @@ if ( $github_repo ) {
 }
 
 # sets up the caches for each repo
-foreach my $repo (@repositories) {
+foreach my $repo ( @repositories ) {
     my $cache_key = cache_key( $repo );
-    my $cached = $cache->get($cache_key) || [];
+    my $cached = $cache->get( $cache_key ) || [];
 
     # only sets the cache to the list of watchers if it was previously empty
-    if (! scalar @{$cached}) {
-        $mech->get("$base_url/$github_username/$repo/watchers");
+    if ( !scalar @{$cached} ) {
+        $mech->get( "$base_url/$github_username/$repo/watchers" );
         my $watchers = decode_json( $mech->content )->{watchers};
         $cache->set( $cache_key => $watchers );
     }
-    if ($verbose) {
+    if ( $verbose ) {
         say "\nCache for $repo has " . scalar @{$cached} . " watchers.";
         say "Cached watchers are:";
         say dump $cached;
     }
 }
 
-while (1) {
-    
-    foreach my $repo (@repositories) {
+while ( 1 ) {
+
+    foreach my $repo ( @repositories ) {
         my $cache_key = cache_key( $repo );
-        $mech->get("$base_url/$github_username/$repo/watchers");
+        $mech->get( "$base_url/$github_username/$repo/watchers" );
         my $watchers = decode_json( $mech->content )->{watchers};
 
         # sets some default Growl message information
         my $title   = "$repo: Watcher count idle.";
         my $subject = "Repo has " . @{$watchers} . " watchers.";
-    
-        # does some comparisons between the current watcher list and the old one
+
+      # does some comparisons between the current watcher list and the old one
         my $lc = List::Compare->new(
-            {   lists    => [ $cache->get($cache_key), $watchers ],
+            {   lists    => [ $cache->get( $cache_key ), $watchers ],
                 unsorted => 1,
             }
         );
 
         my @lost   = $lc->get_unique;
         my @gained = $lc->get_complement;
-    
-        if (@lost) {
+
+        if ( @lost ) {
             $subject .= "\n\nUnwatchers: " . join ", ", @lost;
-            if ($verbose) {
+            if ( $verbose ) {
                 say "Unwatchers:";
                 say dump @lost;
             }
         }
-    
-        if (@gained) {
+
+        if ( @gained ) {
             $subject .= "\n\nNew watchers: " . join ", ", @gained;
-            if ($verbose) {
+            if ( $verbose ) {
                 say "New watchers:";
                 say dump @gained;
             }
         }
-    
+
         # updates the cache and changes the title if the watchers have changed
         if ( @lost || @gained ) {
             $title = "$repo: Watcher count changed!";
             $cache->set( $cache_key => $watchers );
         }
-    
+
         notify(
             {   name    => "Watcher-Watcher",
                 title   => $title,
@@ -159,11 +162,11 @@ while (1) {
         );
 
         # slight delay between growls when watching multiple repos
-        sleep(1);
+        sleep( 1 );
     }
 
-    sleep($delay_seconds);
-    last if !$delay_seconds; # ends loop if number of seconds is < 1
+    sleep( $delay_seconds );
+    last if !$delay_seconds;    # ends loop if number of seconds is < 1
 }
 
 sub cache_key {
@@ -179,7 +182,7 @@ exit 0;
 
 sub parse_program_arguments {
 
-    my $args = Getopt::Declare->new(<<'EOT');
+    my $args = Getopt::Declare->new( <<'EOT');
 
 	-u[sername] <username>	Github username to check
 			{ $::github_username = $username; }
@@ -194,7 +197,7 @@ sub parse_program_arguments {
 
 EOT
 
-    if ($verbose) {
+    if ( $verbose ) {
         say "\n***** Arguments *****";
         say "Username: $github_username";
         say "Repo:     $github_repo";
