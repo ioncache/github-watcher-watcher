@@ -1,10 +1,9 @@
 #!/usr/bin/env perl
 
 use FindBin;
-use lib "$FindBin::Bin/../Growl-Tiny/lib";
 
 use CHI;
-use Data::Dump qw( dump );
+use Data::Printer;
 use Getopt::Declare;
 use Growl::Tiny qw( notify );
 use JSON;
@@ -48,8 +47,10 @@ foreach my $repo ( @{$github_repositories} ) {
 }
 
 if ( $verbose ) {
+    use Data::Printer;
+    p $verbose;
     say "\nRepositories owned by $github_username:";
-    say dump @repositories;
+    p @repositories;
 }
 
 # if commandline repo name(s) list exists, use that list instead of the
@@ -87,7 +88,7 @@ if ( $github_repo ) {
 
     if ( $verbose ) {
         say "\nRepos to be watched:";
-        say dump @repositories;
+        p @repositories;
     }
 }
 
@@ -105,7 +106,7 @@ foreach my $repo ( @repositories ) {
     if ( $verbose ) {
         say "\nCache for $repo has " . scalar @{$cached} . " watchers.";
         say "Cached watchers are:";
-        say dump $cached;
+        p $cached;
     }
 }
 
@@ -134,7 +135,7 @@ while ( 1 ) {
             $subject .= "\n\nUnwatchers: " . join ", ", @lost;
             if ( $verbose ) {
                 say "Unwatchers:";
-                say dump @lost;
+                p @lost;
             }
         }
 
@@ -142,7 +143,7 @@ while ( 1 ) {
             $subject .= "\n\nNew watchers: " . join ", ", @gained;
             if ( $verbose ) {
                 say "New watchers:";
-                say dump @gained;
+                p @gained;
             }
         }
 
